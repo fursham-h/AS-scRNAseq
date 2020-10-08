@@ -18,7 +18,7 @@ ah <- AnnotationHub()
 mouse_genome <- ah[['AH60127']]
 
 # Step 2.2: prepare dataframe containing a list of gene-if, gene_name and chromosome origin
-mouse_genes <- distinct(cbind(mouse_genome$gene_id, mouse_genome$gene_name, seqnames(mouse_genome)) ) 
+mouse_genes <- distinct(data.frame(gene_id = mouse_genome$gene_id, gene_name = mouse_genome$gene_name, chromosome = as.character(seqnames(mouse_genome)))) 
 #to be continued
 
 # Step 3: Create Seurat object 

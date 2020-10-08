@@ -4,6 +4,22 @@
 # Step 2: re-annotate MT genes
 # I will assist with this 
 
+# Step 2.1: download mouse reference genome
+# firstly, we need to install a package that contain genome databases 
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("AnnotationHub")
+
+# load mouse genome
+library(AnnotationHub) 
+ah <- AnnotationHub()
+
+# retrieve latest GRCm38 annotation from ensembl
+mouse_genome <- ah[['AH60127']]
+
+# Step 2.2: prepare dataframe containing a list of gene-if, gene_name and chromosome origin
+mouse_genes <- distinct(cbind(mouse_genome$gene_id, mouse_genome$gene_name, seqnames(mouse_genome)) ) 
+#to be continued
 
 # Step 3: Create Seurat object 
 

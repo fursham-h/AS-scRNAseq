@@ -27,6 +27,8 @@ Some of the current tasks that can be done:
 
 - [ ] Literature review of scRNA-seq workflows (Smart-Seq vs 10X Genomics)
 - [ ] Literature review of single-cell alternative splicing analysis
-- [ ] Download count matrix from scRNA-seq dataset
-- [ ] Familiarize with Seurat package and R programming
-
+- [x] Download count matrix from scRNA-seq dataset
+- [x] Familiarize with Seurat package and R programming
+- [ ] Import scRNA-seq matrix into R
+- [ ] Carry QC on dataset and normalise+scale data
+- [ ] Perform dimensional reduction (preferably UMAP/tSNE) and create clusters 

@@ -4,6 +4,12 @@
 ## and the first column of the data has feature names.
 ## We need to import the data in such a way that the first row will be converted to column names
 ## and the first column converted into row names
+> library(Seurat)
+> library(patchwork)
+> library(dplyr)
+
+> setwd("~/Desktop/Seurat")
+
 input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.txt", header = TRUE, sep = "", row.names = 1)
 > rownames(input.matrix) %>% head(n=5)
 [1] "ENSMUSG00000000001|GNAI3"

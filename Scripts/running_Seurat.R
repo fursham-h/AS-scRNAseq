@@ -37,14 +37,33 @@ Active assay: RNA (25616 features, 0 variable features)
 ## I just realize that MT genes have been annotated in the list of features.
 ## However, it is named like this "ENSMUSG00000064336-MT-TF"
 ## Therefore, the pattern input for PercentageFeatureSet function will be different
+> mydata[["percent.mt"]] <- PercentageFeatureSet(mydata, pattern = "^ENSMUSG00000064336-MT-TF")
+> head(mydata@meta.data, 5)
+> plot1 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "percent.mt")
+> plot2 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+> plot1 + plot2
 
 
 
 # Step 4: Normalize, identify highly variable features and scale data 
+> mydata <- NormalizeData(mydata, normalization.method = "LogNormalize", scale.factor = 10000)
+> mydata <- FindVariableFeatures(mydata, selection.method = "vst", nfeatures = 2000)
+> top10 <- head(VariableFeatures(mydata), 10)
+> plot1 <- VariableFeaturePlot(mydata)
+> plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+When using repel, set xnudge and ynudge to 0 for optimal results
+Warning message:
+Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.
+Please use `as_label()` or `as_name()` instead.
+This warning is displayed once per session. 
+> plot1 + plot2
+Error in grid.Call(C_convert, x, as.integer(whatfrom), as.integer(whatto),  : 
+  Viewport has zero dimension(s)
 
-
-
-
+> all.genes <- rownames(mydata)
+There were 13 warnings (use warnings() to see them)
+> mydata <-ScaleData(mydata, features = all.genes)
+                   
 # Step 5: carry out linear dimensional reduction
 
 

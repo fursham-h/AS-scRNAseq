@@ -151,7 +151,8 @@ nrow(input.matrix)
 #F: NEW, I want to rename the rows to just use the gene_names
 input.matrix <- input.matrix %>% 
   rownames_to_column("ID") %>% 
-  mutate(ID = features.df$gene_name) %>% 
+  separate(names, c("gene_id","ID"), sep = "\\|") %>%
+  dplyr::select(-gene_id) %>%
   group_by(ID) %>% 
   mutate(across(everything(), sum)) %>% 
   ungroup() %>% 

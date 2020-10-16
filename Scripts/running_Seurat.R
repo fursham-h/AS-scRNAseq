@@ -9,7 +9,6 @@ library(patchwork)
 library(dplyr)
 
 setwd("~/Desktop/Seurat")
-
 input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.txt", header = TRUE, sep = "", row.names = 1) #F: Good
 input.matrix[1:5,1:5]
 #                          C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all
@@ -43,70 +42,12 @@ input.matrix[1:5,1:5]
 # ENSMUSG00000000031|H19                                      2231
 # ENSMUSG00000000037|SCML2                                       0
 
-# Step 2: Create Seurat object 
-mydata <- CreateSeuratObject(counts = input.matrix, min.cells = 3, min.genes = 200, project = "interneuron") #F: Good
-# Warning: Feature names cannot have underscores ('_'), replacing with dashes ('-')
-# Warning: Feature names cannot have pipe characters ('|'), replacing with dashes ('-')
+# Step 2: Clean up input dataset
+# We will apply several filters to select for high quality cells and contributing features for this analysis
 
-mydata
-# An object of class Seurat 
-# 25616 features across 2669 samples within 1 assay 
-# Active assay: RNA (25616 features, 0 variable features)
-
-# Step 3: Perform QC on dataset and subset data further 
-## I just realize that MT genes have been annotated in the list of features.
-## However, it is named like this "ENSMUSG00000064336-MT-TF"
-## Therefore, the pattern input for PercentageFeatureSet function will be different
-mydata[["percent.mt"]] <- PercentageFeatureSet(mydata, pattern = "-MT") #F: Good, you can also use "-MT-" to be extra precise
-head(mydata@meta.data, 5)
-#              orig.ident
-# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all interneuron
-# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all  interneuron
-# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all  interneuron
-# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all  interneuron
-# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all  interneuron
-#                                          nCount_RNA
-# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all     651271
-# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all     1027481
-# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all     1462016
-# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all     1220828
-# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all      553652
-#                                          nFeature_RNA
-# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all         3198
-# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all          2847
-# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all          3444
-# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all          3495
-# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all          3371
-#                                          percent.mt
-# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all  0.5816319
-# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all   2.4223319
-# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all   2.6754153
-# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all   3.2504988
-# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all   1.1888334
-plot1 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "percent.mt")
-plot2 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-plot1 + plot2
-VlnPlot(mydata, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-mydata <- subset(mydata, subset = nFeature_RNA > 300 & nFeature_RNA < 6000 & percent.mt < 5)
-
-#F: again, very impressed that you are able to locate the right column to find these gene types
-# You earned a free gift :P
-
+## Filter 1: Select coding genes
+### We need to import a mouse GRCm38 annotation and parse data for gene_ids of coding genes
 mouse.gtf <- rtracklayer::import("Mus_musculus.GRCm38.101.gtf")
-
-
-#C: Hmm how do I make it so that it can subset with several conditions? As in gene_biotype == "miRNA" OR "rRNA" OR "processed_pseudogene" etc? I tried |
-#F: See below
-gtf_df <- as.data.frame(mouse.gtf)
-geneid_df <- dplyr::select(gtf_df,c(gene_name,gene_id,gene_biotype))
-ribo.miRNA.genes <- subset(geneid_df, subset = gene_biotype %in% c("rRNA","miRNA"))
-unique(ribo.miRNA.genes$gene_biotype)
-# [1] "miRNA" "rRNA" 
-
-
-
-
-
 
 #F: first things first, you can preview the type of genes in the annotation
 unique(mouse.gtf$gene_biotype)
@@ -207,7 +148,18 @@ input.matrix <- input.matrix[features.df$coding,]
 nrow(input.matrix)
 # [1] 20087  #F: See it works ;P
 
-#F: This next part is a abit tedious to understand, but bear with me. We can go through this
+#F: NEW, I want to rename the rows to just use the gene_names
+input.matrix <- input.matrix %>% 
+  rownames_to_column("ID") %>% 
+  mutate(ID = features.df$gene_name) %>% 
+  group_by(ID) %>% 
+  mutate(across(everything(), sum)) %>% 
+  ungroup() %>% 
+  distinct(ID, .keep_all = T) %>% 
+  column_to_rownames("ID") %>% 
+  as.matrix()
+
+#Filter 2: This next part is a abit tedious to understand, but bear with me. We can go through this
 # you need matrixStats package
 install.packages("matrixStats")
 
@@ -216,7 +168,8 @@ input.matrix <- input.matrix[,colSums2(as.matrix(input.matrix)) > 50000]
 ncol(input.matrix)
 # [1] 2658
 
-#F: Next, We will try to remove features that are expressed in less than 10 cells with less than 5CPM
+
+#Filter 3: Next, We will try to remove features that are expressed in less than 10 cells with less than 5CPM
 # 5CPM means that instead of counts, each feature in each gene have been normalized.
 # So we will use Seurat NormalizeData function to get this normalized value, but we will later re-normalize after filtering is done
 testdata <- CreateSeuratObject(counts = input.matrix, project = "filter")
@@ -247,28 +200,60 @@ input.matrix[1:5,1:5]
 # ENSMUSG00000000056|NARF                                        0
 # ENSMUSG00000000078|KLF6                                        0
 
-#F: then we can recreate the seuratobject and filter the cells further
-mydata <- CreateSeuratObject(counts = input.matrix, min.cells = 3, min.genes = 200, project = "interneuron") #F: Good
 
-mydata[["percent.mt"]] <- PercentageFeatureSet(mydata, pattern = "-MT")
+# Step 3: Create Seurat object 
+mydata <- CreateSeuratObject(counts = input.matrix, min.cells = 3, min.genes = 200, project = "interneuron") #F: Good
+# Warning: Feature names cannot have underscores ('_'), replacing with dashes ('-')
+# Warning: Feature names cannot have pipe characters ('|'), replacing with dashes ('-')
+
+mydata
+# An object of class Seurat 
+# 25616 features across 2669 samples within 1 assay 
+# Active assay: RNA (25616 features, 0 variable features)
+
+# Step 4: Perform QC on dataset and subset data further 
+## I just realize that MT genes have been annotated in the list of features.
+## However, it is named like this "ENSMUSG00000064336-MT-TF"
+## Therefore, the pattern input for PercentageFeatureSet function will be different
+mydata[["percent.mt"]] <- PercentageFeatureSet(mydata, pattern = "^MT-") #F: I changed the pattern, since the naming is changed
 head(mydata@meta.data, 5)
+#              orig.ident
+# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all interneuron
+# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all  interneuron
+# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all  interneuron
+# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all  interneuron
+# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all  interneuron
+#                                          nCount_RNA
+# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all     651271
+# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all     1027481
+# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all     1462016
+# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all     1220828
+# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all      553652
+#                                          nFeature_RNA
+# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all         3198
+# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all          2847
+# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all          3444
+# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all          3495
+# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all          3371
+#                                          percent.mt
+# C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all  0.5816319
+# C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all   2.4223319
+# C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all   2.6754153
+# C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all   3.2504988
+# C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all   1.1888334
 plot1 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "percent.mt")
 plot2 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 plot1 + plot2
 VlnPlot(mydata, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 mydata <- subset(mydata, subset = nFeature_RNA > 300 & nFeature_RNA < 6000 & percent.mt < 5)
 
-#F: The correlation plot is slightly better, but this improves downstream analysis
 
-
-
-# Step 4: Normalize, identify highly variable features and scale data 
+# Step 5: Normalize, identify highly variable features and scale data 
 mydata <- NormalizeData(mydata, normalization.method = "LogNormalize", scale.factor = 1000000)
 
 
-#F: THe authors used a different method for selection.method. Check the paper again and see if you can
-# replicate their method in Seurat
-mydata <- FindVariableFeatures(mydata, selection.method = "vst", nfeatures = 800)
+#F: THe authors used a different method for selection.method. Another free gift from me ;P
+mydata <- FindVariableFeatures(mydata, selection.method = "mvp", mean.cutoff = c(0.5,8), dispersion.cutoff = c(0.5,5))
 top10 <- head(VariableFeatures(mydata), 10)
 plot1 <- VariableFeaturePlot(mydata)
 plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
@@ -281,17 +266,10 @@ plot1 + plot2
 # Error in grid.Call(C_convert, x, as.integer(whatfrom), as.integer(whatto),  : 
 #   Viewport has zero dimension(s)
 
-all.genes <- rownames(mydata)
-# There were 13 warnings (use warnings() to see them)
+#F: Just scale the data based on highly variable features
 
 
 
-
-
-
-
-#F: Try Scaling the data with only the highly-variant features too
-                   
 # Step 5: carry out linear dimensional reduction
 
 

@@ -266,7 +266,29 @@ plot1 + plot2
 # Error in grid.Call(C_convert, x, as.integer(whatfrom), as.integer(whatto),  : 
 #   Viewport has zero dimension(s)
 
-#F: Just scale the data based on highly variable features
+#F: I scaled the data based on highly variable features
+mydata <- ScaleData(mydata)
+
+
+
+# Step 6: Regress out cell cycle determinants
+## Collect s and g2m genes
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+# Score Cell cycle genes
+mydata <- CellCycleScoring(mydata, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+# RUn a PCA plot to see if cells cluster based on mitotic phase
+mydata <- RunPCA(mydata, features = c(s.genes, g2m.genes))
+DimPlot(mydata, reduction = "pca")
+
+# Regress out cell cycle factors
+mydata <- ScaleData(mydata, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(mydata))
+
+# Re-check PCA plot
+mydata <- RunPCA(mydata, features = c(s.genes, g2m.genes))
+DimPlot(mydata, reduction = "pca")
 
 
 

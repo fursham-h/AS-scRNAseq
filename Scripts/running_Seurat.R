@@ -9,7 +9,8 @@ library(patchwork)
 library(dplyr)
 
 setwd("~/Desktop/Seurat")
-input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.txt", header = TRUE, sep = "", row.names = 1) #F: Good
+input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt", header = TRUE, sep = "", row.names = 1) #F: Good
+
 input.matrix[1:5,1:5]
 #                          C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all
 # ENSMUSG00000000001|GNAI3                                        0
@@ -98,36 +99,17 @@ mouse.gtf %>%
 coding.genes <- mouse.gtf %>% 
   as.data.frame() %>% 
   dplyr::select(gene_name, gene_id, gene_biotype) %>% 
-  filter(gene_biotype == "protein_coding")
+  filter(gene_biotype == "protein_coding") %>%
+	distinct()
 
 #F: Now we will filter input.matrix to only select genes containing protein_coding gene_ids
 # you might need tidyverse for this
 install.packages("tidyverse")
 
-# 1) extract the feature names from input.matrix into a dataframe
-features.df <- data.frame(names = rownames(input.matrix))
-head(features.df)
-# names
-# 1 ENSMUSG00000000001|GNAI3
-# 2  ENSMUSG00000000003|PBSN
-# 3 ENSMUSG00000000028|CDC45
-# 4   ENSMUSG00000000031|H19
-# 5 ENSMUSG00000000037|SCML2
-# 6  ENSMUSG00000000049|APOH
+# 1) import feature info df
+features.df <- read.table("feature_info.txt", header = TRUE, sep = "\t", strings as factors = F)
 
-# 2) I want to split the gene_id and gene_name from each other.
-features.df <- features.df %>% 
-  separate(names, c("gene_id","gene_name"), sep = "\\|")
-head(features.df)
-# gene_id gene_name
-# 1 ENSMUSG00000000001     GNAI3
-# 2 ENSMUSG00000000003      PBSN
-# 3 ENSMUSG00000000028     CDC45
-# 4 ENSMUSG00000000031       H19
-# 5 ENSMUSG00000000037     SCML2
-# 6 ENSMUSG00000000049      APOH
-
-# 3) add a new column to annotate if the gene_id corresponds to a coding gene
+# 3+2) add a new column to annotate if the gene_id corresponds to a coding gene
 features.df <- features.df %>% 
   mutate(coding = ifelse(gene_id %in% coding.genes$gene_id,T,F))
 head(features.df)
@@ -148,17 +130,7 @@ input.matrix <- input.matrix[features.df$coding,]
 nrow(input.matrix)
 # [1] 20087  #F: See it works ;P
 
-#F: NEW, I want to rename the rows to just use the gene_names
-input.matrix <- input.matrix %>% 
-  rownames_to_column("ID") %>% 
-  separate(names, c("gene_id","ID"), sep = "\\|") %>%
-  dplyr::select(-gene_id) %>%
-  group_by(ID) %>% 
-  mutate(across(everything(), sum)) %>% 
-  ungroup() %>% 
-  distinct(ID, .keep_all = T) %>% 
-  column_to_rownames("ID") %>% 
-  as.matrix()
+
 
 #Filter 2: This next part is a abit tedious to understand, but bear with me. We can go through this
 # you need matrixStats package

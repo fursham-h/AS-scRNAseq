@@ -266,16 +266,38 @@ DimPlot(mydata, reduction = "pca")
 
 
 # Step 5: carry out linear dimensional reduction
-
-
-
+mydata <- RunPCA(mydata, features = VariableFeatures(object = mydata))
+print(mydata[["pca"]], dims = 1:5, nfeatures = 5)
+DimPlot(mydata, reduction = "pca")
+mydata <- JackStraw(mydata, num.replicate = 100)
+mydata <- ScoreJackStraw(mydata, dims = 1:20)
+JackStrawPlot(mydata, dims = 1:15)
+ElbowPlot(mydata)
 
 # Step 6: Cluster cells
 
+mydata <- FindNeighbors(mydata, dims = 1:20)
+mydata <- FindClusters(mydata, resolution = 0.5)
 
+ead(Idents(mydata), 5)
+C1.101.A10_CGAGGCTG.GCGTAAGA_L008_R1_all 
+                                       2 
+ C1.101.A1_TAAGGCGA.GCGTAAGA_L008_R1_all 
+                                       2 
+ C1.101.A4_TCCTGAGC.GCGTAAGA_L008_R1_all 
+                                       2 
+ C1.101.A5_GGACTCCT.GCGTAAGA_L008_R1_all 
+                                       2 
+ C1.101.A6_TAGGCATG.GCGTAAGA_L008_R1_all 
+                                       2 
+Levels: 0 1 2 3 4 5
 
 
 # Step 7: Perform non-linear dimensional reduction 
+mydata <- RunTSNE(mydata, dims = 1:15)
+DimPlot(mydata, reduction = "tsne")
+mydata <- RunTSNE(mydata, dims = 1:20)
+DimPlot(mydata, reduction = "tsne")
 
 
 

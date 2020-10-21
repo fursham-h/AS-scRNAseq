@@ -299,5 +299,41 @@ DimPlot(mydata, reduction = "tsne")
 mydata <- RunTSNE(mydata, dims = 1:20)
 DimPlot(mydata, reduction = "tsne")
 
+cluster1.markers <- FindMarkers(mydata, ident.1 = 1, min.pct = 0.25)
+head(cluster1.markers, n = 5)
+
+            p_val  avg_logFC pct.1 pct.2
+UBB   1.909436e-93  0.7510312 0.996 0.992
+ACTB  4.728563e-82 -1.2824096 0.996 0.999
+CALM2 5.274970e-82  0.6294871 1.000 0.988
+H3F3B 5.705517e-53  0.4315733 1.000 0.999
+FTL1  4.221011e-50  0.5655340 0.995 0.969
+         p_val_adj
+UBB   3.383138e-89
+ACTB  8.378068e-78
+CALM2 9.346193e-78
+H3F3B 1.010904e-48
+FTL1  7.478787e-46
 
 
+cluster5.markers <- FindMarkers(mydata, ident.1 = 5, ident.2 = c(0, 3), min.pct = 0.25)
+
+head(cluster5.markers, n = 5)
+                p_val avg_logFC pct.1 pct.2
+UBA7    1.027604e-126  4.572348 0.583 0.002
+FOXQ1   2.656204e-124  5.186104 0.667 0.003
+BGN     1.233717e-106  6.274896 0.833 0.010
+ARHGEF5 1.290730e-106  5.465554 0.667 0.005
+NID1    9.576607e-102  6.603009 0.917 0.014
+            p_val_adj
+UBA7    1.820708e-122
+FOXQ1   4.706263e-120
+BGN     2.185900e-102
+ARHGEF5 2.286915e-102
+NID1     1.696783e-97
+
+mydata.markers <- FindAllMarkers(mydata, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+mydata.markers %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+
+top10 <- mydata.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+DoHeatmap(mydata, features = top10$gene) + NoLegend()

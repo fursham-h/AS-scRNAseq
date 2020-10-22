@@ -1,0 +1,244 @@
+---
+title: "Running Seurat"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+This is a ReadMe file for the processing of single-cell RNA-seq data derived from embryonic mouse cortical interneurons [Mi et al](https://science.sciencemag.org/content/360/6384/81). The input of this analysis is a count matrix describing the total reads mapped to each gene feature, with slight modification. Counts derived from the same gene family have been combined using custom R script. In addition, a dataframe describing the ID of each gene is provided (feature_info.txt).  
+
+The following packages are to be loaded into the environment for this workflow:
+```{r loadpackages, include=FALSE}
+library(Seurat)
+library(patchwork)
+library(rtracklayer)
+library(tidyverse)
+library(matrixStats)
+```
+
+
+## Step 1: Import dataset into R as matrix
+Firstly, locate the directory containing the count matrix and feature_info file in your computer.  
+Then, Import GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz file as a matrix.
+
+```{r importmatrix}
+setwd("~/Desktop/Seurat")
+input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz", header = TRUE, sep = "", row.names = 1) #F: Good
+
+# preview matrix
+input.matrix[1:5,1:5]
+```
+
+
+## Step 2: Clean-up dataset
+Dataset will have to be filtered to select for high quality features and cells.  
+3 types of filters will be applied:
+
+#### Filter 1: Select coding genes
+We need to download and import a recent mouse GRCm38 annotation to parse data for gene_ids of coding genes
+```{r getmousegenes}
+setwd("~/Desktop/Seurat")
+mouse.gtf <- rtracklayer::import("Mus_musculus.GRCm38.101.gtf.gz")
+
+#F: first things first, you can preview the type of genes in the annotation
+unique(mouse.gtf$gene_biotype)
+
+#F: As you can see, there are alot of non-coding genes in the annotation. 
+# it sort of make more sense to select only protein_coding genes since it makes up the bulk of the annotation
+
+#F: Here, I am going to generate a table on the number of genes in each gene_biotype category
+# You don't need to understand it, but maybe you could try to find out what does "%>%" does
+mouse.gtf %>% 
+  as.data.frame() %>% 
+  filter(type == "gene") %>% 
+  group_by(gene_biotype) %>% 
+  tally() %>% 
+  arrange(desc(n))
+
+#F: Make a dataframe containing gene_name and gene_id of protein coding genes
+coding.genes <- mouse.gtf %>% 
+  as.data.frame() %>% 
+  dplyr::select(gene_name, gene_id, gene_biotype) %>% 
+  filter(gene_biotype == "protein_coding") %>%
+	distinct()
+```
+
+Next, we will make use of the gene_id from the feature_info.txt file to select for protein coding genes
+
+```{r filter1}
+setwd("~/Desktop/Seurat")
+features.df <- read.table("feature_info.txt", header = TRUE, sep = "\t", stringsAsFactors = F)
+
+# 3+2) add a new column to annotate if the gene_id corresponds to a coding gene
+features.df <- features.df %>% 
+  mutate(coding = ifelse(gene_id %in% coding.genes$gene_id,T,F))
+head(features.df)
+
+
+#F: you can calculate how many features are retained
+sum(features.df$coding)
+
+
+#4) subset input.matrix to keep only coding genes
+input.matrix <- input.matrix[features.df$coding,]
+nrow(input.matrix)  # to check if the number of features is reduced
+```
+
+
+#### Filter 2: filter for cells that contain at least 50000 reads mapping to coding features(which we have already subsetted)
+```{r filter2}
+ncol(input.matrix)  #before filtering
+
+input.matrix <- input.matrix[,colSums2(as.matrix(input.matrix)) > 50000]
+ncol(input.matrix)  #after filtering
+```
+
+
+#### Filter 3: Remove features that are expressed in less than 10 cells with less than 5CPM
+5CPM means that instead of counts, each feature in each gene have been normalized. So we will use Seurat NormalizeData function to get this normalized value, but we will later re-normalize after filtering is done.
+
+```{r}
+testdata <- CreateSeuratObject(counts = input.matrix, project = "filter")
+testdata <- NormalizeData(testdata, normalization.method = "LogNormalize", scale.factor = 1000000)
+
+# we will select features that have 10 cells with at least than 5CPM expression
+features.to.keep <-  apply(testdata[["RNA"]]@counts, 1, function(x){sum(x>=5) >=10})
+
+# and then filter the input.matrix
+input.matrix <- input.matrix[features.to.keep,]
+input.matrix[1:5,1:5]
+```
+
+## Step 3: Create Seurat Object
+The filtered matrix can now be converted into a Seurat object for downstream analysis
+
+```{r CreateSeurat}
+mydata <- CreateSeuratObject(counts = input.matrix, min.cells = 3, min.genes = 200, project = "interneuron")
+mydata
+```
+
+
+
+
+## Step 4: Perform QC on dataset and subset data further 
+Here, we want to check the quality of the remaining cells and quantify its proportion of mitochondrial genes. This metric will provide a good indication as to whether the cell/GEM is indeed a cell.
+```{r QC}
+mydata[["percent.mt"]] <- PercentageFeatureSet(mydata, pattern = "^MT-") #F: I changed the pattern, since the naming is changed
+head(mydata@meta.data, 5)
+
+VlnPlot(mydata, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+plot1 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(mydata, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot1 + plot2
+
+```
+
+Lastly, we will subset the data further by choosing cells with less than 5% mitochondrial genes
+```{r subset}
+mydata <- subset(mydata, subset = nFeature_RNA > 300 & nFeature_RNA < 6000 & percent.mt < 5)
+```
+
+
+## Step 5: Normalize and scale matrix
+As the name implies, we want to normalize the data so that features can be compared between cells.
+```{r norm}
+mydata <- NormalizeData(mydata, normalization.method = "LogNormalize", scale.factor = 1000000)
+mydata <- ScaleData(mydata)
+```
+
+## Step 6: Regress out cell cycle determinants
+It is very common for cells to cluster based on its mitotic stage. This variable have to be removed/regressed to allow accurate identification of Highly Variable Genes
+
+```{r ccregression, fig.keep='all', message=FALSE, results='hide'}
+## Collect s and g2m genes
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+# Score Cell cycle genes
+mydata <- CellCycleScoring(mydata, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+# Run a PCA plot to see if cells cluster based on mitotic phase
+mydata <- RunPCA(mydata, features = c(s.genes, g2m.genes))
+DimPlot(mydata, reduction = "pca")
+
+# Regress out cell cycle factors
+mydata <- ScaleData(mydata, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(mydata))
+
+# Re-check PCA plot
+mydata <- RunPCA(mydata, features = c(s.genes, g2m.genes))
+DimPlot(mydata, reduction = "pca")
+```
+
+
+## Step 7: Identify Highly Variable Genes and Scale data
+A list of Highly Variable Genes (HVG) will be generated and to be used for downstream analysis including dimensional reduction and clustering.  
+Also, data will be scaled so that values for each feature is comparable
+```{r HVGscale}
+#F: THe authors used a different method for selection.method.
+mydata <- FindVariableFeatures(mydata, selection.method = "mvp", mean.cutoff = c(0.5,8), dispersion.cutoff = c(0.5,5))
+top10 <- head(VariableFeatures(mydata), 10)
+plot1 <- VariableFeaturePlot(mydata)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+#F: I scaled the data based on highly variable features
+mydata <- ScaleData(mydata)
+```
+
+
+## Step 8: Carry out linear dimensional reduction
+This serves as a means determine the relationship between cells from the dataset, using expression patterns from the HVG
+
+```{r PCA}
+mydata <- RunPCA(mydata, features = VariableFeatures(object = mydata))
+
+# check top features in each principal component
+print(mydata[["pca"]], dims = 1:5, nfeatures = 5)
+
+# plot PCA 
+DimPlot(mydata, reduction = "pca", group.by = "old.ident")
+
+# Inspect statistics of principal compenents
+mydata <- JackStraw(mydata, num.replicate = 100)
+mydata <- ScoreJackStraw(mydata, dims = 1:20)
+JackStrawPlot(mydata, dims = 1:15)
+ElbowPlot(mydata)
+```
+
+## Step 9: Cluster cells
+```{r echo=TRUE}
+mydata <- FindNeighbors(mydata, dims = 1:20)
+mydata <- FindClusters(mydata, resolution = 1)
+
+# colour code cells based on cluster
+DimPlot(mydata, reduction = "pca")
+```
+## Step 10: Carry out non-linear dimensional reduction
+
+```{r}
+mydata <- RunTSNE(mydata, dims = 1:10)
+mydata <- RunUMAP(mydata, dims = 1:10)
+
+
+DimPlot(mydata, reduction = "tsne")
+
+DimPlot(mydata, reduction = "umap")
+
+```
+
+## Step 10: Find Biomarkers
+```{r results='hide', fig.keep='all', message = FALSE}
+mydata.markers <- FindAllMarkers(mydata, test.use = "negbinom", only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+top10 <- mydata.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+DoHeatmap(mydata, features = top10$gene) + NoLegend()
+```
+
+
+
+
+

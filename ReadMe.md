@@ -29,6 +29,9 @@ Some of the current tasks that can be done:
 - [ ] Literature review of single-cell alternative splicing analysis
 - [x] Download count matrix from scRNA-seq dataset
 - [x] Familiarize with Seurat package and R programming
-- [ ] Import scRNA-seq matrix into R
-- [ ] Carry QC on dataset and normalise+scale data
-- [ ] Perform dimensional reduction (preferably UMAP/tSNE) and create clusters 
+- [x] Import scRNA-seq matrix into R
+- [x] Carry QC on dataset and normalise+scale data
+- [x] Perform dimensional reduction (preferably UMAP/tSNE) and create clusters 
+- [ ] Identify cluster biomarkers and infer its cell type (if possible)
+- [ ] Label tsne/UMAP plot with cell types annotated from main paper
+- [ ] Plan pipeline for whippet analysis on clustered scRNA-seq transcriptome

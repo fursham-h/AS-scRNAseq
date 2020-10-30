@@ -211,6 +211,7 @@ ElbowPlot(mydata)
 ```
 
 ## Step 9: Cluster cells
+We will use the dimensions from the principal components to find closely-related cells and cluster them. Different resolution values can be used and we will use a resolution of 1
 ```{r echo=TRUE}
 mydata <- FindNeighbors(mydata, dims = 1:20)
 mydata <- FindClusters(mydata, resolution = 1)
@@ -218,8 +219,10 @@ mydata <- FindClusters(mydata, resolution = 1)
 # colour code cells based on cluster
 DimPlot(mydata, reduction = "pca")
 ```
-## Step 10: Carry out non-linear dimensional reduction
 
+
+## Step 10: Carry out non-linear dimensional reduction
+Cell clusters from the PCA plot can be further segragated using non-linear dimensional reduction. We will try both tSNE and UMAP to see how the plot looks like.
 ```{r}
 mydata <- RunTSNE(mydata, dims = 1:10)
 mydata <- RunUMAP(mydata, dims = 1:10)
@@ -231,14 +234,36 @@ DimPlot(mydata, reduction = "umap")
 
 ```
 
-## Step 10: Find Biomarkers
+## Step 11: Find Biomarkers
+For each clusters, we want to determine the group of genes that define that cell type and later infer the cell identity.
 ```{r results='hide', fig.keep='all', message = FALSE}
 mydata.markers <- FindAllMarkers(mydata, test.use = "negbinom", only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+# get top 10 markers from each cluster
 top10 <- mydata.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+
+#Plot heatmap of marker expression in all cells
 DoHeatmap(mydata, features = top10$gene) + NoLegend()
 ```
 
 
+## Step 12: Label cells with annotated cell identity
+We will import the cell information determined by the authors and label the cells based on that information.
+```{r}
+cell.info <- read.table("~/Desktop/cell_information.txt")
+tmp.data.info <- mydata[[]]
+
+tmp.data.info <- tmp.data.info %>% 
+  rownames_to_column("cell_id") %>% 
+  left_join(cell.info) %>% 
+  column_to_rownames("cell_id")
+
+mydata[["Age"]] <- tmp.data.info$Age
+mydata[["CellType"]] <- tmp.data.info$CellType
+
+DimPlot(mydata, reduction = "tsne", group.by = "Age")
+DimPlot(mydata, reduction = "tsne", group.by = "CellType")
+```
 
 
 

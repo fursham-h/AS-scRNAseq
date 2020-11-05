@@ -1,6 +1,8 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output:
+  html_notebook: default
+  pdf_document: default
 ---
 
 
@@ -26,7 +28,7 @@ Then, Import GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz file as a
 
 ```{r importmatrix}
 #setwd("~/Desktop/Seurat")
-input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz", header = TRUE, sep = "", row.names = 1) #F: Good
+input.matrix <- read.table("../GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz", header = TRUE, sep = "", row.names = 1) #F: Good
 
 # preview matrix
 input.matrix[1:5,1:5]
@@ -70,7 +72,7 @@ Next, we will make use of the gene_id from the feature_info.txt file to select f
 
 ```{r filter1}
 #setwd("~/Desktop/Seurat")
-features.df <- read.table("feature_info.txt", header = TRUE, sep = "\t", stringsAsFactors = F)
+features.df <- read.table("../feature_info.txt", header = TRUE, sep = "\t", stringsAsFactors = F)
 
 # 3+2) add a new column to annotate if the gene_id corresponds to a coding gene
 features.df <- features.df %>% 
@@ -123,7 +125,7 @@ mydata
 ## Step 4: Label cells with annotated cell identity
 We will import the cell information determined by the authors and label the cells based on that information.
 ```{r}
-cell.info <- read.delim("cell_information.txt")
+cell.info <- read.delim("../cell_information.txt")
 tmp.data.info <- mydata[[]]
 
 tmp.data.info <- tmp.data.info %>% 
@@ -249,12 +251,21 @@ Cell clusters from the PCA plot can be further segragated using non-linear dimen
 mydata.E14.5 <- RunTSNE(mydata.E14.5, dims = 1:10)
 mydata.E14.5 <- RunUMAP(mydata.E14.5, dims = 1:12)
 
+# group cells based on its proliferative state
+tmp.dat <- mydata.E14.5[[]]
+tmp.dat <- tmp.dat %>% 
+  mutate(State = ifelse(Phase == "G1", "Non-proliferative","Proliferative"))
+mydata.E14.5[["State"]] <- tmp.dat$State
+
 
 DimPlot(mydata.E14.5, reduction = "tsne")
 DimPlot(mydata.E14.5, reduction = "tsne", group.by = "CellType")
 DimPlot(mydata.E14.5, reduction = "tsne", group.by = "Phase")
 #DimPlot(mydata.E14.5, reduction = "umap")
 
+
+DimPlot(mydata.E14.5, reduction = "tsne", group.by = "State")
+FeaturePlot(mydata.E14.5, features = head(g2m.genes,12), reduction = "tsne")
 ```
 
 ## Step 11: Find Biomarkers

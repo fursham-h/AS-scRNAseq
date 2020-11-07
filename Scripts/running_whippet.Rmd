@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 ## 1. Retrieving fastq data.
-We will begin with downloading the data off NCBI Gene Expression Omnibus
+We will begin with downloading the data off NCBI Gene Expression Omnibus. This will download all fastq files of cells from E14.5 timepoint
 ```{bash}
 cd /media/emlab/RAID5/Fursham/Oscar_interneuron
 mkdir fastq
@@ -20,8 +20,48 @@ cd fastq
 while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
 	fastq-dump --gzip $SRA 
 done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
+```
+
+
+## 3. Running whippet quantification
+We will merge fastq files from cells based on its cell type and align that merged file to mm10 genome. Whippet indices for mm10 genome have been prebuilt and found at /media/emlab/RAID5/Genomes....
+
+```{bash}
+cd /media/emlab/RAID5/Fursham/Oscar_interneuron
+mkdir -p whippet/quantify
+mkdir whippet_SAMs
+
+# merge by cell state
+declare -A whippetArray
+declare -A whippetNames
+while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
+  key="$STATEID"
+  whippetArray[$key]="fastq/$SRA.fastq.gz ${whippetArray[$key]}"
+  whippetNames[$key]=$STATE
+done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
+
+#run whippet
+for (( n=1; n<=2; n++ ));do
+	whippet-quant.jl <(cat ${whippetArray[$n]}) -o whippet/quantify/${whippetNames["$n"]} -x /media/emlab/RAID5/Genomes/GRCz10/Ensembl/whippet_index/graph.jls --biascorrect --sam > whippet_SAMs/${whippetNames[$n]}.sam 
+done
+
+# merge by cell type and proliferative state
+declare -A whippetArray2
+declare -A whippetNames2
+while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
+  key="$STATEID.$TYPEID"
+  whippetArray2[$key]="fastq/$SRA.fastq.gz ${whippetArray2[$key]}"
+  whippetNames2[$key]=$STATE
+done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
+
+#run whippet
+for (( n=1; n<=2; n++ ));do
+	whippet-quant.jl <(cat ${whippetArray[$n]}) -o whippet/quantify/${whippetNames["$n"]} -x /media/emlab/RAID5/Genomes/GRCz10/Ensembl/whippet_index/graph.jls --biascorrect --sam > whippet_SAMs/${whippetNames[$n]}.sam 
+done
 
 
 
+
+>
 ```
 

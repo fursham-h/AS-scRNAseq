@@ -1,0 +1,27 @@
+---
+title: "Running Whippet"
+output: html_document
+---
+
+Now that we have obtained informative clusters on the interneuron dataset, we can begin to compare the splicing profiles between group of cells. We will try:
+1. Compare profiles of proliferative vs non-proliferative interneurons
+2. Compare profiles of proliferative states for each cell type (CGE,dMGE,vMGE)
+3. Compare profiles of cell types within each proliferative state
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## 1. Retrieving fastq data.
+We will begin with downloading the data off NCBI Gene Expression Omnibus
+```{bash}
+cd /media/emlab/RAID5/Fursham/Oscar_interneuron
+mkdir fastq
+cd fastq
+while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
+	fastq-dump --gzip $SRA 
+done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
+
+
+
+```
+

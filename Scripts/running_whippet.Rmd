@@ -51,17 +51,14 @@ declare -A whippetNames2
 while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
   key="$STATEID.$TYPEID"
   whippetArray2[$key]="fastq/$SRA.fastq.gz ${whippetArray2[$key]}"
-  whippetNames2[$key]=$STATE
-done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
-
+  whippetNames2[$key]="$STATE_$TYPE"
+done < cluster_information.txt
+~/Documents/git_repo/AS-scRNAseq/
 #run whippet
-for (( n=1; n<=2; n++ ));do
-	whippet-quant.jl <(cat ${whippetArray[$n]}) -o whippet/quantify/${whippetNames["$n"]} -x /media/emlab/RAID5/Genomes/GRCz10/Ensembl/whippet_index/graph.jls --biascorrect --sam > whippet_SAMs/${whippetNames[$n]}.sam 
+for id in ${!whippetArray2[@]};do
+	whippet-quant.jl <(cat ${whippetArray2[$id]}) -o whippet/quantify/${whippetNames2["$id"]} -x /media/emlab/RAID5/Genomes/GRCz10/Ensembl/whippet_index/graph.jls --biascorrect --sam > whippet_SAMs/${whippetNames2[$id]}.sam 
 done
 
 
-
-
->
 ```
 

@@ -27,8 +27,8 @@ Firstly, locate the directory containing the count matrix and feature_info file 
 Then, Import GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz file as a matrix.
 
 ```{r importmatrix}
-#setwd("~/Desktop/Seurat")
-input.matrix <- read.table("../GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz", header = TRUE, sep = "", row.names = 1) #F: Good
+setwd("~/Desktop/Seurat")
+input.matrix <- read.table("GSE109796_Oscar.GEO.singleCell.gene.count.modified.txt.gz", header = TRUE, sep = "", row.names = 1) #F: Good
 
 # preview matrix
 input.matrix[1:5,1:5]
@@ -42,7 +42,7 @@ Dataset will have to be filtered to select for high quality features and cells.
 #### Filter 1: Select coding genes
 We need to download and import a recent mouse GRCm38 annotation to parse data for gene_ids of coding genes
 ```{r getmousegenes}
-setwd("~/Desktop")
+setwd("~/Desktop/Seurat/")
 mouse.gtf <- rtracklayer::import("Mus_musculus.GRCm38.101.gtf.gz")
 
 #F: first things first, you can preview the type of genes in the annotation
@@ -71,8 +71,8 @@ coding.genes <- mouse.gtf %>%
 Next, we will make use of the gene_id from the feature_info.txt file to select for protein coding genes
 
 ```{r filter1}
-#setwd("~/Desktop/Seurat")
-features.df <- read.table("../feature_info.txt", header = TRUE, sep = "\t", stringsAsFactors = F)
+setwd("~/Desktop/Seurat")
+features.df <- read.table("feature_info.txt", header = TRUE, sep = "\t", stringsAsFactors = F)
 
 # 3+2) add a new column to annotate if the gene_id corresponds to a coding gene
 features.df <- features.df %>% 
@@ -279,5 +279,19 @@ top10 <- mydata.E14.5.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_l
 
 #Plot heatmap of marker expression in all cells
 DoHeatmap(mydata.E14.5, features = top10$gene) + NoLegend()
+```
+
+## Step 12: export cell clusters
+```{r}
+SRA_table <- read.delim("../SraRunTable-1.txt", sep = ",")
+metadata <- mydata.E14.5[[]] %>%
+  rownames_to_column("cell_id") %>%
+  left_join(cell.info %>% dplyr::select(cell_id,Accession)) %>%
+  left_join(SRA_table %>% dplyr::select(Accession = GEO_Accession..exp., Run)) %>%
+  mutate(ProliferativeGroup = ifelse(State=="Proliferative", 1,2)) %>%
+  left_join(tibble(CellType = unique(.$CellType), CellTypeGroup = c(1:4))) %>%
+  dplyr::select(Run, cell_id, CellType, CellTypeGroup, State, ProliferativeGroup, seurat_clusters)
+
+write.table(metadata, "../cluster_information.txt", col.names = F, row.names = F, sep = "\t", quote = F)
 ```
 

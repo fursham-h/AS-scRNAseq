@@ -51,11 +51,7 @@ declare -A whippetNames2
 while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
   key="$STATEID.$TYPEID"
   whippetArray2[$key]="fastq/$SRA.fastq.gz ${whippetArray2[$key]}"
-<<<<<<< HEAD
-  whippetNames2[$key]="$STATE_$TYPE"
-=======
-  whippetNames2[$key]="$STATE_$TYPE"
->>>>>>> 782e855e49dcea0adce2bcd27cabdf6b74dceb73
+  whippetNames2[$key]="$STATE-$TYPE"
 done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
 
 #run whippet

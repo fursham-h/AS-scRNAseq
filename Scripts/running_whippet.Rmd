@@ -75,7 +75,7 @@ tibble::tibble(sampleA = c("Proliferative", "Proliferative-CGE", "Proliferative-
 ```
 
 
-
+Using the list of comparisons, run whippet delta splicing analysis
 
 ```{bash}
 cd /media/emlab/RAID5/Fursham/Oscar_interneuron/whippet/quantify
@@ -86,4 +86,24 @@ done < ../../whippet_comparisons.txt
 
 
 ```
+
+## 4. Convert aligned sequence file (SAMs) to binary format (BAMs) and index them
+```{bash}
+cd /media/emlab/RAID5/Fursham/Oscar_interneuron
+mkdir whippet_sorted_BAMs
+for filename in whippet_SAMs/*.sam; do
+	file=${filename##*/}
+	file=${file%.sam}
+	samtools view -@ 40 -Su $filename | samtools sort -@ 40 -o whippet_sorted_BAMs/$file.bam
+done
+
+
+
+# 5) generate indexed bamfiles
+cd /media/emlab/RAID5/Fursham/Yeo_sALS/whippet_sorted_BAMs
+for filename in *.bam; do
+    samtools index -@ 40 $filename $filename.bai
+done
+```
+
 

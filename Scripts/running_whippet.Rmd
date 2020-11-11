@@ -51,13 +51,42 @@ declare -A whippetNames2
 while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
   key="$STATEID.$TYPEID"
   whippetArray2[$key]="fastq/$SRA.fastq.gz ${whippetArray2[$key]}"
-  whippetNames2[$key]="$STATE-$TYPE"
+<<<<<<< HEAD
+  whippetNames2[$key]="$STATE_$TYPE"
+=======
+  whippetNames2[$key]="$STATE_$TYPE"
+>>>>>>> 782e855e49dcea0adce2bcd27cabdf6b74dceb73
 done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
 
 #run whippet
 for id in ${!whippetArray2[@]};do
 	whippet-quant.jl <( cat ${whippetArray2[$id]} ) -o whippet/quantify/${whippetNames2["$id"]} -x /media/emlab/RAID5/Genomes/GRCz10/Ensembl/whippet_index/graph.jls --force-gz --biascorrect --sam > whippet_SAMs/${whippetNames2[$id]}.sam 
 done
+
+
+```
+
+## 4. Running whippet differential splicing
+We will now compare differential splicing between the comparisons mentioned on line 6  
+We will start by preparing a data-frame of containing a set of samples to compare
+```{r}
+setwd("/media/emlab/RAID5/Fursham/Oscar_interneuron")
+library(tidyverse)
+tibble::tibble(sampleA = c("Proliferative", "Proliferative-CGE", "Proliferative-dMGE", "Proliferative-vMGE", "Proliferative-vMGE", "Proliferative-vMGE", "Proliferative-dMGE", "Non-proliferative-vMGE", "Non-proliferative-vMGE", "Non-proliferative-dMGE"),
+               sampleB = c("Non-proliferative", "Non-proliferative-CGE", "Non-proliferative-dMGE", "Non-proliferative-vMGE", "Proliferative-dMGE", "Proliferative-CGE", "Proliferative-CGE", "Non-proliferative-dMGE", "Non-proliferative-CGE", "Non-proliferative-CGE"),
+               name = c("Proliferative_vs_Non-proliferative", "Proliferative_vs_Non-proliferative_CGE", "Proliferative_vs_Non-proliferative_dMGE", "Proliferative_vs_Non-proliferative_vMGE", "vMGE_vs_dMGE_Proliferative", "vMGE_vs_CGE_Proliferative", "dMGE_vs_CGE_Proliferative", "vMGE_vs_dMGE_Non-proliferative", "vMGE_vs_CGE_Non-proliferative", "dMGE_vs_CGE_Non-proliferative")) %>% write.table("whippet_comparisons.txt", sep = "\t", quote = F, row.names = F, col.names = F)
+  
+```
+
+
+
+
+```{bash}
+cd /media/emlab/RAID5/Fursham/Oscar_interneuron/whippet/quantify
+mkdir ../delta
+while IFS=$'\t' read -r A B NAME;do 
+  whippet-delta.jl -a $A.psi.gz, -b $A.psi.gz, -o ../delta/$NAME
+done < ../../whippet_comparisons.txt
 
 
 ```

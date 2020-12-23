@@ -60,6 +60,27 @@ for id in ${!whippetArray2[@]};do
 done
 
 
+# merge by cell type only
+declare -A whippetArray3
+declare -A whippetNames3
+declare -A whippetArray4
+declare -A whippetNames4
+while IFS=$'\t' read -r SRA ID TYPE TYPEID STATE STATEID CLUSTERID;do 
+  whippetArray3[$TYPE]="fastq/$SRA.fastq.gz ${whippetArray3[$TYPE]}"
+  whippetNames3[$TYPE]="$TYPE"
+  whippetArray4[$CLUSTERID]="fastq/$SRA.fastq.gz ${whippetArray4[$CLUSTERID]}"
+  whippetNames4[$CLUSTERID]="Cluster_$CLUSTERID"
+done < ~/Documents/git_repo/AS-scRNAseq/cluster_information.txt
+
+#run whippet
+for id in dMGE vMGE CGE;do
+	whippet-quant.jl <( cat ${whippetArray3[$id]} ) -o whippet/quantify/${whippetNames3["$id"]} -x /media/emlab/RAID5/Genomes/GRCm38_mm10/Ensembl/whippet_index/graph.jls --force-gz --biascorrect --sam > whippet_SAMs/${whippetNames3[$id]}.sam 
+done
+
+for id in 0 2;do
+	whippet-quant.jl <( cat ${whippetArray4[$id]} ) -o whippet/quantify/${whippetNames4["$id"]} -x /media/emlab/RAID5/Genomes/GRCm38_mm10/Ensembl/whippet_index/graph.jls --force-gz --biascorrect --sam > whippet_SAMs/${whippetNames4[$id]}.sam 
+done
+
 ```
 
 ## 4. Running whippet differential splicing
@@ -84,6 +105,11 @@ while IFS=$'\t' read -r A B NAME;do
   whippet-delta.jl -a $A.psi.gz, -b $A.psi.gz, -o ../delta/$NAME
 done < ../../whippet_comparisons.txt
 
+# compare cell types
+whippet-delta.jl -a vMGE.psi.gz, -b dMGE.psi.gz, -o ../delta/vMGE_dMGE
+whippet-delta.jl -a vMGE.psi.gz, -b CGE.psi.gz, -o ../delta/vMGE_CGE
+whippet-delta.jl -a dMGE.psi.gz, -b CGE.psi.gz, -o ../delta/dMGE_CGE
+whippet-delta.jl -a Cluster_0.psi.gz, -b Cluster_2.psi.gz, -o ../delta/Cluster0_Cluster2
 
 ```
 
